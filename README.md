@@ -420,6 +420,7 @@ Elimina asignaciones innecesarias como temp = temp.
 El compilador genera los siguientes archivos:
 
 archivo_codigo_intermedio.txt: Código de tres direcciones sin optimizar.
+
 archivo_codigo_optimizado.txt: Código de tres direcciones optimizado.
 
 
