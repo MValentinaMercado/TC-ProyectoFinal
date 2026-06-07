@@ -12,7 +12,10 @@ Rosales Mercado, Morena Valentina
 
 Este proyecto constituye la implementación completa de un compilador para un subconjunto del lenguaje C++, desarrollado como proyecto final para la materia Técnicas de Compilación. El compilador incluye análisis léxico, sintáctico, semántico, generación de código intermedio y optimizaciones.
 
+
+
 **Funcionalidades Implementadas**
+
 Análisis Léxico: Reconocimiento de tokens y símbolos del lenguaje.
 Análisis Sintáctico: Construcción del árbol sintáctico abstracto (AST).
 Análisis Semántico: Tabla de símbolos y verificación de tipos.
