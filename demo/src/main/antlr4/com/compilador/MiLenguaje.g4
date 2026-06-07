@@ -1,12 +1,16 @@
 grammar MiLenguaje;
 
 // ============================================================
-// PARSER
+// PROGRAMA
 // ============================================================
 
 programa
     : declaracion* EOF
     ;
+
+// ============================================================
+// DECLARACIONES
+// ============================================================
 
 declaracion
     : declaracionVariable
@@ -27,6 +31,10 @@ tipo
     | VOID
     ;
 
+// ============================================================
+// FUNCIONES
+// ============================================================
+
 declaracionFuncion
     : tipo ID PA parametros? PC bloque
     ;
@@ -39,6 +47,10 @@ parametro
     : tipo ID
     | tipo ID CA CC
     ;
+
+// ============================================================
+// BLOQUES Y SENTENCIAS
+// ============================================================
 
 bloque
     : LA sentencia* LC
@@ -58,14 +70,12 @@ sentencia
     | bloque
     ;
 
-incremento
-    : ID INC
-    | ID DEC
-    ;
+// ============================================================
+// CONTROL DE FLUJO
+// ============================================================
 
 sentenciaIf
-    : IF PA expresion PC bloque
-      (ELSE bloque)?
+    : IF PA expresion PC bloque (ELSE bloque)?
     ;
 
 sentenciaWhile
@@ -73,14 +83,7 @@ sentenciaWhile
     ;
 
 sentenciaFor
-    : FOR PA
-        inicializacionFor?
-        PYC
-        expresion?
-        PYC
-        actualizacionFor?
-      PC
-      bloque
+    : FOR PA inicializacionFor? PYC expresion? PYC actualizacionFor? PC bloque
     ;
 
 inicializacionFor
@@ -110,13 +113,17 @@ sentenciaContinue
     : CONTINUE PYC
     ;
 
+retorno
+    : RETURN expresion? PYC
+    ;
+
+// ============================================================
+// ASIGNACIONES / LLAMADAS
+// ============================================================
+
 asignacion
     : ID IGUAL expresion PYC
     | ID CA expresion CC IGUAL expresion PYC
-    ;
-
-retorno
-    : RETURN expresion? PYC
     ;
 
 llamadaFuncion
@@ -127,37 +134,40 @@ argumentos
     : expresion (COMA expresion)*
     ;
 
+incremento
+    : ID INC
+    | ID DEC
+    ;
+
+// ============================================================
+// EXPRESIONES (IMPORTANTE: LIMPIAS Y SIN AMBIGÜEDAD)
+// ============================================================
+
 expresion
-    : expresion OR expresion                                            #ExprOr
-    | expresion AND expresion                                           #ExprAnd
+    : expresion OR expresion                    #ExprOr
+    | expresion AND expresion                   #ExprAnd
 
-    | expresion (EQL | DISTINTO) expresion                              #ExprIgualdad
+    | expresion (EQL | DISTINTO) expresion      #ExprIgualdad
+    | expresion (MAYOR | MENOR | MAYOR_IGUAL | MENOR_IGUAL) expresion #ExprRelacional
 
-    | expresion (MAYOR | MENOR | MAYOR_IGUAL | MENOR_IGUAL) expresion   #ExprRelacional
+    | expresion (SUM | RES) expresion           #ExprAditiva
+    | expresion (MUL | DIV | MOD) expresion     #ExprMultiplicativa
 
-    | expresion (SUM | RES) expresion                                   #ExprAditiva
+    | NOT expresion                             #ExprNot
+    | RES expresion                             #ExprNegativo
 
-    | expresion (MUL | DIV | MOD) expresion                             #ExprMultiplicativa
+    | PA expresion PC                           #ExprAgrupada
 
-    | NOT expresion                                                     #ExprNot
+    | llamadaFuncion                            #ExprLlamada
+    | ID CA expresion CC                        #ExprArray
+    | ID                                        #ExprIdentificador
 
-    | RES expresion                                                     #ExprNegativo
-
-    | PA expresion PC                                                   #ExprAgrupada
-
-    | NUM                                                               #ExprNumero
-    | DECIMAL                                                           #ExprDecimal
-    | CHARACTER                                                         #ExprCaracter
-    | CADENA                                                            #ExprCadena
-
-    | TRUE                                                              #ExprTrue
-    | FALSE                                                             #ExprFalse
-
-    | llamadaFuncion                                                    #ExprLlamada
-
-    | ID CA expresion CC                                                #ExprArray
-
-    | ID                                                                #ExprIdentificador
+    | NUM                                       #ExprEntero
+    | DECIMAL                                   #ExprDecimal
+    | CHARACTER                                 #ExprCaracter
+    | CADENA                                    #ExprCadena
+    | TRUE                                      #ExprTrue
+    | FALSE                                     #ExprFalse
     ;
 
 // ============================================================
@@ -169,10 +179,8 @@ fragment DIGITO : [0-9] ;
 
 PA : '(' ;
 PC : ')' ;
-
 CA : '[' ;
 CC : ']' ;
-
 LA : '{' ;
 LC : '}' ;
 
