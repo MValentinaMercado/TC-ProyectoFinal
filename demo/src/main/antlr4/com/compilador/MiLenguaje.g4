@@ -1,99 +1,261 @@
 grammar MiLenguaje;
 
-// Regla parser mínima (requerida por ANTLR)
+// ============================================================
+// PARSER
+// ============================================================
 
-//mvn clean package
-//java -jar target/demo-1.0-jar-with-dependencies.jar ejemplo.txt
-
-programa : (token)* EOF ;
-
-expr
-    : expr OR term          # OrExpr
-    | term                  # JustTerm
+programa
+    : declaracion* EOF
     ;
 
-term
-    : term AND factor       # AndTerm
-    | factor                # JustFactor
+declaracion
+    : declaracionVariable
+    | declaracionFuncion
     ;
 
-factor
-    : NOT factor            # NotFactor
-    | PA expr PC            # Parentheses
-    | NUM                   # Number
-    | TRUE                  # TrueLit
-    | FALSE                 # FalseLit
+declaracionVariable
+    : tipo ID (IGUAL expresion)? PYC
+    | tipo ID CA NUM CC PYC
     ;
 
-token : PA | PC | CA | CC | LA | LC | TRUE | FALSE | PYC | COMA | IGUAL | MAYOR | MAYOR_IGUAL
-      | MENOR | MENOR_IGUAL | EQL | DISTINTO | SUM | RES | MUL | DIV | MOD
-      | OR | AND | NOT | FOR | WHILE | IF | ELSE | INT | CHAR | DOUBLE | VOID
-      | RETURN | ID | NUM | INTEGER | DECIMAL | CHARACTER | OTRO
-      ;
+tipo
+    : INT
+    | DOUBLE
+    | CHAR
+    | STRING
+    | BOOL
+    | VOID
+    ;
 
-fragment LETRA : [A-Za-z];
-fragment DIGITO : [0-9];
+declaracionFuncion
+    : tipo ID PA parametros? PC bloque
+    ;
 
-// TOKENS
+parametros
+    : parametro (COMA parametro)*
+    ;
 
+parametro
+    : tipo ID
+    | tipo ID CA CC
+    ;
 
-PA   : '(' ;
-PC   : ')' ;
-CA   : '[' ;
-CC   : ']' ;
-LA   : '{' ;
-LC   : '}' ;
+bloque
+    : LA sentencia* LC
+    ;
 
-TRUE  : 'true' ;
-FALSE : 'false' ;
+sentencia
+    : declaracionVariable
+    | asignacion
+    | incremento PYC
+    | llamadaFuncion PYC
+    | sentenciaIf
+    | sentenciaWhile
+    | sentenciaFor
+    | sentenciaBreak
+    | sentenciaContinue
+    | retorno
+    | bloque
+    ;
 
-PYC  : ';' ;
+incremento
+    : ID INC
+    | ID DEC
+    ;
+
+sentenciaIf
+    : IF PA expresion PC bloque
+      (ELSE bloque)?
+    ;
+
+sentenciaWhile
+    : WHILE PA expresion PC bloque
+    ;
+
+sentenciaFor
+    : FOR PA
+        inicializacionFor?
+        PYC
+        expresion?
+        PYC
+        actualizacionFor?
+      PC
+      bloque
+    ;
+
+inicializacionFor
+    : declaracionFor
+    | asignacionFor
+    ;
+
+declaracionFor
+    : tipo ID IGUAL expresion
+    ;
+
+asignacionFor
+    : ID IGUAL expresion
+    ;
+
+actualizacionFor
+    : ID INC
+    | ID DEC
+    | ID IGUAL expresion
+    ;
+
+sentenciaBreak
+    : BREAK PYC
+    ;
+
+sentenciaContinue
+    : CONTINUE PYC
+    ;
+
+asignacion
+    : ID IGUAL expresion PYC
+    | ID CA expresion CC IGUAL expresion PYC
+    ;
+
+retorno
+    : RETURN expresion? PYC
+    ;
+
+llamadaFuncion
+    : ID PA argumentos? PC
+    ;
+
+argumentos
+    : expresion (COMA expresion)*
+    ;
+
+expresion
+    : expresion OR expresion                                            #ExprOr
+    | expresion AND expresion                                           #ExprAnd
+
+    | expresion (EQL | DISTINTO) expresion                              #ExprIgualdad
+
+    | expresion (MAYOR | MENOR | MAYOR_IGUAL | MENOR_IGUAL) expresion   #ExprRelacional
+
+    | expresion (SUM | RES) expresion                                   #ExprAditiva
+
+    | expresion (MUL | DIV | MOD) expresion                             #ExprMultiplicativa
+
+    | NOT expresion                                                     #ExprNot
+
+    | RES expresion                                                     #ExprNegativo
+
+    | PA expresion PC                                                   #ExprAgrupada
+
+    | NUM                                                               #ExprNumero
+    | DECIMAL                                                           #ExprDecimal
+    | CHARACTER                                                         #ExprCaracter
+    | CADENA                                                            #ExprCadena
+
+    | TRUE                                                              #ExprTrue
+    | FALSE                                                             #ExprFalse
+
+    | llamadaFuncion                                                    #ExprLlamada
+
+    | ID CA expresion CC                                                #ExprArray
+
+    | ID                                                                #ExprIdentificador
+    ;
+
+// ============================================================
+// LEXER
+// ============================================================
+
+fragment LETRA : [A-Za-z] ;
+fragment DIGITO : [0-9] ;
+
+PA : '(' ;
+PC : ')' ;
+
+CA : '[' ;
+CC : ']' ;
+
+LA : '{' ;
+LC : '}' ;
+
+PYC : ';' ;
 COMA : ',' ;
 
 IGUAL : '=' ;
 
-MAYOR  : '>' ;
-MAYOR_IGUAL: '>=';
-MENOR  : '<' ;
-MENOR_IGUAL: '<=';
-EQL  : '==';
-DISTINTO  : '!=';
+EQL : '==' ;
+DISTINTO : '!=' ;
 
-SUM  : '+' ;
-RES  : '-' ;
-MUL  : '*' ;
-DIV  : '/' ;
-MOD  : '%' ;
+MAYOR_IGUAL : '>=' ;
+MENOR_IGUAL : '<=' ;
 
-OR    : 'or' ;
-AND   : 'and' ;
-NOT   : 'not' ;
+MAYOR : '>' ;
+MENOR : '<' ;
 
-FOR  : 'for';
-WHILE: 'while';
+INC : '++' ;
+DEC : '--' ;
 
-IF   : 'if' ;
+SUM : '+' ;
+RES : '-' ;
+MUL : '*' ;
+DIV : '/' ;
+MOD : '%' ;
+
+OR : '||' ;
+AND : '&&' ;
+NOT : '!' ;
+
+IF : 'if' ;
 ELSE : 'else' ;
 
-INT     : 'int' ;
-CHAR    : 'char' ;
-DOUBLE  : 'double' ;
-VOID    : 'void' ;
+WHILE : 'while' ;
+FOR : 'for' ;
 
-RETURN : 'return';
+BREAK : 'break' ;
+CONTINUE : 'continue' ;
 
-ID      : (LETRA | '_') (LETRA | DIGITO | '_')* ;
-NUM     : DIGITO+ ;
+RETURN : 'return' ;
 
-INTEGER : DIGITO+ ;
-DECIMAL : INTEGER '.' INTEGER ;
-CHARACTER : '\'' (~['\r\n] | '\\' .) '\'' ;
+INT : 'int' ;
+DOUBLE : 'double' ;
+CHAR : 'char' ;
+STRING : 'string' ;
+BOOL : 'bool' ;
+VOID : 'void' ;
 
+TRUE : 'true' ;
+FALSE : 'false' ;
 
-// Comentarios - Se ignoran durante el análisis
-//COMENTARIO_LINEA : '//' ~[\r\n]*; sin ocultar
-COMENTARIO_LINEA : '//' ~[\r\n]* -> skip;
-COMENTARIO_BLOQUE : '/*' .*? '*/' -> skip;
+ID
+    : (LETRA | '_') (LETRA | DIGITO | '_')*
+    ;
 
-WS : [ \r\n\t] -> skip ;
-OTRO : . ;
+DECIMAL
+    : DIGITO+ '.' DIGITO+
+    ;
+
+NUM
+    : DIGITO+
+    ;
+
+CHARACTER
+    : '\'' (~['\r\n] | '\\' .) '\''
+    ;
+
+CADENA
+    : '"' (~["\\\r\n] | '\\' .)* '"'
+    ;
+
+COMENTARIO_LINEA
+    : '//' ~[\r\n]* -> skip
+    ;
+
+COMENTARIO_BLOQUE
+    : '/*' .*? '*/' -> skip
+    ;
+
+WS
+    : [ \t\r\n]+ -> skip
+    ;
+
+OTRO
+    : .
+    ;
