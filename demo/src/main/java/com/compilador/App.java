@@ -1,5 +1,6 @@
 package com.compilador;
 
+import com.compilador.codigoIntermedio.CodigoTresDir;
 import com.compilador.semantico.SemanticAnalyzer;
 import com.compilador.semantico.SemanticError;
 import com.compilador.semantico.Scope;
@@ -10,7 +11,9 @@ import org.antlr.v4.runtime.tree.ParseTree;
 
 import javax.swing.*;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -18,7 +21,6 @@ import java.util.List;
 public class App {
 
     public static void main(String[] args) {
-
 
         if (args.length != 1) {
             System.out.println("Uso: java -jar compilador.jar <archivo.cpp>");
@@ -70,8 +72,8 @@ public class App {
                 return;
             }
 
-            System.out.println("Analisis lexico completado sin errores.");
-            System.out.println(" Tokens procesados: " + cantidadTokens);
+            System.out.println(" Analisis lexico completado sin errores.");
+            System.out.println("   Tokens procesados: " + cantidadTokens);
 
             // =========================
             // 2. SINTACTICO
@@ -104,7 +106,7 @@ public class App {
                 return;
             }
 
-            System.out.println("Analisis sintactico completado sin errores.");
+            System.out.println(" Analisis sintactico completado sin errores.");
             System.out.println("   Arbol sintactico generado correctamente");
 
             // =========================
@@ -127,10 +129,7 @@ public class App {
             System.out.println("   Tabla de simbolos construida:");
             analyzer.getTablaSimbolos().imprimirTabla();
 
-            // =========================
-            // ERRORES SEMANTICOS (van antes que warnings, como en la salida esperada)
-            // =========================
-
+            // Errores semanticos
             if (analyzer.hayErrores()) {
                 System.out.println("ERRORES SEMANTICOS:");
                 for (SemanticError e : analyzer.getErrores()) {
@@ -158,15 +157,48 @@ public class App {
                 System.out.println("   El codigo tiene warnings, pero se puede continuar.");
             }
 
+            System.out.println(" Analisis semantico completado sin errores.");
+
             // =========================
-            // RESUMEN (solo si compilacion exitosa)
+            // 5. CODIGO INTERMEDIO
+            // =========================
+
+            System.out.println("\n=== 5. GENERACION DE CODIGO INTERMEDIO ===");
+            System.out.println(" Iniciando recorrido del AST con CodigoTresDir...");
+
+            CodigoTresDir generador = new CodigoTresDir();
+            generador.visit(arbol);
+
+            generador.imprimir();
+
+            // Guardar en archivo
+            String nombreBase = Paths.get(archivo).getFileName().toString();
+            // Quitar extension si la tiene
+            if (nombreBase.contains(".")) {
+                nombreBase = nombreBase.substring(0, nombreBase.lastIndexOf('.'));
+            }
+            String archivoSalida = nombreBase + "_codigo_intermedio.txt";
+
+            try (PrintWriter pw = new PrintWriter(archivoSalida, "UTF-8")) {
+                pw.println("// Codigo de tres direcciones generado");
+                for (String linea : generador.getLineas()) {
+                    pw.println(linea);
+                }
+            }
+
+            System.out.println("  Codigo intermedio guardado en: " + archivoSalida);
+
+            // =========================
+            // 7. RESUMEN (solo si compilacion exitosa)
             // =========================
 
             System.out.println("\n=== 7. RESUMEN DE COMPILACION ===");
             System.out.println("   Archivo procesado: " + archivo);
             System.out.println("   Tokens analizados: " + cantidadTokens);
             System.out.println("   Simbolos en tabla: " + contarSimbolos(analyzer));
-            System.out.println(" COMPILACION EXITOSA!");
+            System.out.println("   Instrucciones generadas: " + generador.getCantidadInstrucciones());
+            System.out.println("  Codigo intermedio guardado en: " + archivoSalida);
+            System.out.println("    COMPILACION  EXITOSA!");
 
         } catch (IOException e) {
             System.out.println("Error al leer archivo: " + e.getMessage());
