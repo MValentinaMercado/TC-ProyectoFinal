@@ -1,0 +1,45 @@
+// Codigo optimizado - Pasada 1
+// Instrucciones en esta pasada: 42
+
+ 0: PROGRAMA_INICIO:
+ 1: // Declaracion de variables globales
+ 2: DECLARE contadorGlobal int
+ 3: DECLARE valorPi double
+ 4: DECLARE inicial char
+ 5: DECLARE activo bool
+ 6: func_sumar:
+ 7: PARAM a int
+ 8: PARAM b int
+ 9: t1 = a + b
+10: resultado = t1
+11: t2 = contadorGlobal + 1
+12: contadorGlobal = t2
+13: return resultado
+14: func_main:
+15: contadorGlobal = 0
+16: valorPi = 3.14
+17: inicial = 'M'
+18: numeros[0] = 10
+19: numeros[1] = 20
+20: numeros[2] = 30
+21: t3 = numeros[0]
+22: t4 = numeros[1]
+23: t5 = t3 + t4
+24: t6 = t5 * 2
+25: t7 = t6 / 3
+26: t8 = t7 % 5
+27: temp = t8
+28: CALL func_sumar, temp, 5
+29: estado = RETURN_VALUE
+30: contadorGlobal = estado
+31: valorPi = temp
+32: inicial = 'X'
+33: t9 = estado > 0
+34: if t9 goto THEN_1
+35: goto END_IF_1
+36: THEN_1:
+37: t10 = estado + 10
+38: estado = t10
+39: END_IF_1:
+40: return estado
+41: PROGRAMA_FIN:

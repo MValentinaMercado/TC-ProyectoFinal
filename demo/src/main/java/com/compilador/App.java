@@ -1,6 +1,7 @@
 package com.compilador;
 
 import com.compilador.codigoIntermedio.CodigoTresDir;
+import com.compilador.optimizacion.Optimizador;
 import com.compilador.semantico.SemanticAnalyzer;
 import com.compilador.semantico.SemanticError;
 import com.compilador.semantico.Scope;
@@ -171,15 +172,15 @@ public class App {
 
             generador.imprimir();
 
-            // Guardar en archivo
+            // Calcular nombre base (sin extension) para todos los archivos de salida
             String nombreBase = Paths.get(archivo).getFileName().toString();
-            // Quitar extension si la tiene
             if (nombreBase.contains(".")) {
                 nombreBase = nombreBase.substring(0, nombreBase.lastIndexOf('.'));
             }
+
             String archivoSalida = nombreBase + "_codigo_intermedio.txt";
 
-            try (PrintWriter pw = new PrintWriter(archivoSalida, "UTF-8")) {
+            try (PrintWriter pw = new PrintWriter(archivoSalida, StandardCharsets.UTF_8)) {
                 pw.println("// Codigo de tres direcciones generado");
                 for (String linea : generador.getLineas()) {
                     pw.println(linea);
@@ -189,16 +190,50 @@ public class App {
             System.out.println("  Codigo intermedio guardado en: " + archivoSalida);
 
             // =========================
+            // 6. OPTIMIZACIÓN
+            // =========================
+
+            System.out.println("\n=== 6. OPTIMIZACION DE CODIGO ===");
+            System.out.println("   Aplicando optimizaciones al codigo intermedio...");
+
+            Optimizador optimizador = new Optimizador(generador);
+            // Pasan nombreBase para que guarde un archivo por cada pasada:
+            //   {nombreBase}_optimizacion_pasada_1.txt, _pasada_2.txt, etc.
+            optimizador.optimizar(nombreBase);
+
+            System.out.println("Optimizacion completada:");
+            System.out.printf("   Instrucciones originales:  %d%n", optimizador.getCantidadOriginal());
+            System.out.printf("   Instrucciones optimizadas: %d%n", optimizador.getCantidadOptimizada());
+            System.out.printf("   Instrucciones eliminadas:  %d%n", optimizador.getCantidadEliminadas());
+            System.out.printf("   Reduccion de codigo: %.2f%%%n",   optimizador.getPorcentajeReduccion());
+
+            System.out.println();
+            optimizador.imprimir();
+
+            String archivoOptimizado = nombreBase + "_codigo_optimizado.txt";
+
+            try (PrintWriter pwOpt = new PrintWriter(archivoOptimizado, StandardCharsets.UTF_8)) {
+                pwOpt.println("// Codigo optimizado generado");
+                for (String linea : optimizador.getLineas()) {
+                    pwOpt.println(linea);
+                }
+            }
+
+            System.out.println("  Codigo optimizado guardado en: " + archivoOptimizado);
+
+            // =========================
             // 7. RESUMEN (solo si compilacion exitosa)
             // =========================
 
             System.out.println("\n=== 7. RESUMEN DE COMPILACION ===");
-            System.out.println("   Archivo procesado: " + archivo);
-            System.out.println("   Tokens analizados: " + cantidadTokens);
-            System.out.println("   Simbolos en tabla: " + contarSimbolos(analyzer));
-            System.out.println("   Instrucciones generadas: " + generador.getCantidadInstrucciones());
-            System.out.println("  Codigo intermedio guardado en: " + archivoSalida);
-            System.out.println("    COMPILACION  EXITOSA!");
+            System.out.println("   Archivo procesado:         " + archivo);
+            System.out.println("   Tokens analizados:         " + cantidadTokens);
+            System.out.println("   Simbolos en tabla:         " + contarSimbolos(analyzer));
+            System.out.println("   Instrucciones generadas:   " + optimizador.getCantidadOriginal());
+            System.out.println("   Instrucciones optimizadas: " + optimizador.getCantidadOptimizada());
+            System.out.println("   Archivo codigo intermedio: " + archivoSalida);
+            System.out.println("   Archivo codigo optimizado: " + archivoOptimizado);
+            System.out.println("    COMPILACION Y OPTIMIZACION EXITOSA!");
 
         } catch (IOException e) {
             System.out.println("Error al leer archivo: " + e.getMessage());
