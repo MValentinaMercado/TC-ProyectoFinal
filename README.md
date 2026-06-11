@@ -410,10 +410,10 @@ Evalúa expresiones constantes en tiempo de compilación:
 5 + 3 → 8
 10 * 2 → 20
 15 - 7 → 8
+
 4. Eliminación de Sentencias Redundantes
 
 Elimina asignaciones innecesarias como temp = temp.
-
 
 ## Archivos Generados
 
