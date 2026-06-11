@@ -205,7 +205,27 @@ public class App {
             System.out.printf("   Instrucciones originales:  %d%n", optimizador.getCantidadOriginal());
             System.out.printf("   Instrucciones optimizadas: %d%n", optimizador.getCantidadOptimizada());
             System.out.printf("   Instrucciones eliminadas:  %d%n", optimizador.getCantidadEliminadas());
-            System.out.printf("   Reduccion de codigo: %.2f%%%n",   optimizador.getPorcentajeReduccion());
+            System.out.printf("   Reduccion de codigo:       %.2f%%%n", optimizador.getPorcentajeReduccion());
+            System.out.printf("   Pasadas ejecutadas:        %d%n", optimizador.getCantidadPasadas());
+            System.out.println();
+            System.out.println("   Detalle por pasada:");
+            System.out.println("   +---------+----------+----------+-----------+");
+            System.out.println("   | Pasada  |  Antes   | Despues  | Eliminadas|");
+            System.out.println("   +---------+----------+----------+-----------+");
+            int pasadaNum = 1;
+            int elimPrev = Integer.MAX_VALUE;
+            for (int[] stat : optimizador.getEstadisticasPorPasada()) {
+                int antes = stat[0], despues = stat[1], elim = stat[2];
+                String tendencia = "";
+                if (pasadaNum > 1) {
+                    tendencia = elim < elimPrev ? " (menor)" : elim == 0 ? " (punto fijo)" : " (igual)";
+                }
+                System.out.printf("   | Pasada %d | %-8d | %-8d | %-9d |%s%n",
+                    pasadaNum, antes, despues, elim, tendencia);
+                elimPrev = elim;
+                pasadaNum++;
+            }
+            System.out.println("   +---------+----------+----------+-----------+");
 
             System.out.println();
             optimizador.imprimir();

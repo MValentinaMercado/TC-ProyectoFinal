@@ -174,6 +174,8 @@ public class Optimizador {
     private final List<Instruccion> original;
     private List<TacLine>           trabajo;
     private int eliminadas = 0;
+    // Lista de estadisticas por pasada: cada int[] = {instrAntes, instrDespues, eliminadasEnPasada}
+    private final List<int[]> estadisticasPorPasada = new ArrayList<>();
     private final Set<String>       globales;
     // =========================================================================
     // CONSTRUCTOR
@@ -201,25 +203,47 @@ public class Optimizador {
         return optimizar(null);
     }
     /**
-     * Optimiza hasta punto fijo.
+     * Optimiza hasta punto fijo comparando CONTENIDO (no solo tamaño).
      * Si nombreBase != null, guarda {nombreBase}_optimizacion_pasada_N.txt por cada iteración.
+     * Registra estadísticas por pasada en estadisticasPorPasada.
      */
     public List<Instruccion> optimizar(String nombreBase) {
+        estadisticasPorPasada.clear();
         int pasada = 1;
-        int antesSize;
+        String antesContenido;
         do {
-            antesSize = trabajo.size();
+            int antesSize = trabajo.size();
+            antesContenido = serializar(trabajo);
+
             propagarConstantes();
             simplificarExpresiones();
             eliminarCodigoMuerto();
             eliminarTemporalesMuertos();
+
+            int despuesSize = trabajo.size();
+            int eliminadasEnPasada = antesSize - despuesSize;
+            estadisticasPorPasada.add(new int[]{antesSize, despuesSize, eliminadasEnPasada});
+
             if (nombreBase != null) {
                 guardarPasada(nombreBase, pasada);
             }
             pasada++;
-        } while (trabajo.size() != antesSize);
+        } while (!serializar(trabajo).equals(antesContenido));
+
         eliminadas = original.size() - trabajo.size();
         return reconstruir();
+    }
+
+    /**
+     * Serializa la lista de instrucciones a un String único para comparar contenido.
+     * Dos listas son iguales si y solo si tienen las mismas instrucciones en el mismo orden.
+     */
+    private String serializar(List<TacLine> lista) {
+        StringBuilder sb = new StringBuilder();
+        for (TacLine t : lista) {
+            sb.append(t.toString()).append('\n');
+        }
+        return sb.toString();
     }
     // =========================================================================
     // GUARDAR ARCHIVO POR PASADA
@@ -248,6 +272,14 @@ public class Optimizador {
     public double getPorcentajeReduccion() {
         if (original.isEmpty()) return 0.0;
         return (eliminadas * 100.0) / original.size();
+    }
+    /** Devuelve las estadisticas por pasada: cada int[] = {instrAntes, instrDespues, eliminadasEnPasada}. */
+    public List<int[]> getEstadisticasPorPasada() {
+        return Collections.unmodifiableList(estadisticasPorPasada);
+    }
+    /** Devuelve la cantidad total de pasadas ejecutadas. */
+    public int getCantidadPasadas() {
+        return estadisticasPorPasada.size();
     }
     // =========================================================================
     // 1. PROPAGACIÓN DE CONSTANTES
