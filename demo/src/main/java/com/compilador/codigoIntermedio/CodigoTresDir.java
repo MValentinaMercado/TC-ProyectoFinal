@@ -14,11 +14,6 @@ import java.util.List;
  *     (un temporal "tN", un nombre de variable, o un literal).
  *   - Metodos de SENTENCIAS/DECLARACIONES devuelven null.
  *
- * Formato de salida (sin optimizar), segun ejemplo_correcto:
- *   - Variables globales: DECLARE nombre tipo
- *   - Funciones: etiqueta func_nombre: seguida de PARAM y cuerpo
- *   - if: evaluacion + "if tX goto THEN_N" + "goto END_IF_N" + etiquetas
- *   - Llamadas: CALL func_nombre, arg1, arg2  /  dest = RETURN_VALUE
  */
 public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
 
