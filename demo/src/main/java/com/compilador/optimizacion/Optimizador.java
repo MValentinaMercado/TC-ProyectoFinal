@@ -301,8 +301,6 @@ public class Optimizador {
                     res.add(t);
                     break;
                 case CALL:
-                    // FIX 2: solo sustituir temporales en argumentos de CALL,
-                    // no variables con nombre semántico real
                     t.arg1 = sustituirArgsCall(t.arg1, sustituciones);
                     res.add(t);
                     sustituciones.clear();
