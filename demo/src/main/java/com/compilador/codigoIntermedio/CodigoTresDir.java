@@ -7,47 +7,78 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Genera codigo de tres direcciones (TAC) recorriendo el AST.
+ * ============================================================
+ * CodigoTresDir
+ * ============================================================
  *
- * Extiende MiLenguajeBaseVisitor<String>:
- *   - Metodos de EXPRESIONES devuelven el "lugar" del resultado
- *     (un temporal "tN", un nombre de variable, o un literal).
- *   - Metodos de SENTENCIAS/DECLARACIONES devuelven null.
+ * Generador de Código de Tres Direcciones
+ *
+ *     Recorre el AST (ParseTree) generado por ANTLR y produce
+ *     una representación intermedia (TAC) que será usada por
+ *     etapas posteriores (optimización).
+ *
+ *   - Extiende MiLenguajeBaseVisitor<String>.
+ *   - Las visitas a expresiones devuelven un "lugar" (place):
+ *       • un temporal (tN)
+ *       • el nombre de una variable
+ *       • un literal (ej. "5", "true", "\"hola\"")
+ *       • o la cadena especial "RETURN_VALUE" cuando una llamada
+ *         a función produce un valor que será asignado por el
+ *         contexto llamador.
+ *
+ *   - Las visitas a declaraciones y sentencias devuelven null
+ *     (su efecto es emitir instrucciones).
+ *
+ *   - Los temporales se generan con nuevaTemp() (t1, t2, ...).
+ *   - Las etiquetas para control de flujo son únicas por contador.
+ *   - Se emiten instrucciones mediante emitir(Instruccion).
+ *   - La lista instrucciones contiene el TAC en orden secuencial.
  *
  */
+
 public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
 
-    // =========================================================================
-    // ESTADO INTERNO
-    // =========================================================================
+    /** Lista de instrucciones TAC generadas */
 
     private final List<Instruccion> instrucciones = new ArrayList<>();
 
-    // Contador de temporales: t1, t2, t3, ...
+    /** Contador de temporales: t1, t2, t3, ... */
+
     private int contTemp = 0;
 
-    // Contador de etiquetas de if/else
+    /** Contador de etiquetas para if/else */
+
     private int contIf   = 0;
 
-    // Contador de etiquetas de while
+    /** Contador de etiquetas para while */
+
     private int contWhile = 0;
 
-    // Contador de etiquetas de for
+    /** Contador de etiquetas para for */
+
     private int contFor  = 0;
 
-    // Contexto: true = estamos en ambito global (para DECLARE global)
+    /** Contexto: true = estamos en ámbito global (para DECLARE global) */
+
     private boolean esGlobal = true;
 
-    // Nombre de la funcion actual (para PARAM y contexto)
+    /** Nombre de la función actual (útil para emitir PARAM/RETURN en contexto) */
+
     private String funcionActual = null;
 
-    // =========================================================================
-    // AUXILIARES
-    // =========================================================================
+
+    /**
+     * Genera un nuevo temporal único.
+     */
 
     private String nuevaTemp() {
         return "t" + (++contTemp);
     }
+
+    /**
+     * Añade una instrucción a la lista interna.
+     * Centraliza el punto donde se acumulan las instrucciones.
+     */
 
     private void emitir(Instruccion i) {
         instrucciones.add(i);
@@ -61,15 +92,10 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return instrucciones.size();
     }
 
-    // =========================================================================
-    // IMPRESION
-    // =========================================================================
-
     /**
-     * Imprime las instrucciones numeradas.
-     * Las etiquetas y comentarios reciben numero de linea como el resto,
-     * igual al formato del ejemplo_correcto donde todas las lineas estan numeradas.
+     * Imprime las instrucciones numeradas por consola.
      */
+
     public void imprimir() {
         System.out.println();
         for (int i = 0; i < instrucciones.size(); i++) {
@@ -78,8 +104,10 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
     }
 
     /**
-     * Devuelve el codigo como lista de strings para guardar en archivo.
+     * Devuelve el código TAC como lista de líneas formateadas.
+     * Cada línea incluye el número de instrucción
      */
+
     public List<String> getLineas() {
         List<String> lineas = new ArrayList<>();
         for (int i = 0; i < instrucciones.size(); i++) {
@@ -88,9 +116,16 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return lineas;
     }
 
-    // =========================================================================
-    // VISITOR — Programa
-    // =========================================================================
+    /**
+     * visitPrograma:
+     *
+     * Flujo general:
+     *   1) Emitir etiqueta de inicio del programa.
+     *   2) Emitir declaraciones globales (DECLARE).
+     *   3) Emitir funciones (cada función con su etiqueta y cuerpo).
+     *   4) Emitir etiqueta de fin del programa.
+     *
+     */
 
     @Override
     public String visitPrograma(MiLenguajeParser.ProgramaContext ctx) {
@@ -118,25 +153,25 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return null;
     }
 
-    // =========================================================================
-    // VISITOR — Declaraciones de variables
-    // =========================================================================
-
     /**
-     * Declaracion de variable global: solo emite DECLARE (sin inicializador en TAC global).
-     * La inicializacion de globales se hara dentro de main/funciones.
+     * visitDeclaracionVariableGlobal:
+     *
+     * - En ámbito global emitimos DECLARE (o DECLARE_ARRAY).
+     * - Si hay inicializador global, se emite la asignación correspondiente.
+     *
      */
+
     private void visitDeclaracionVariableGlobal(MiLenguajeParser.DeclaracionVariableContext ctx) {
         String nombreTipo = ctx.tipo().getText();
         String nombreVar  = ctx.ID().getText();
 
-        // Verificar si es array: tipo ID '[' NUM ']' ';'
+        // Detectar array: tipo ID '[' NUM ']' ';'
         if (ctx.getChildCount() > 3 && ctx.getChild(2).getText().equals("[")) {
             String size = ctx.NUM().getText();
             emitir(Instruccion.declareArray(nombreVar, size, nombreTipo));
         } else {
             emitir(Instruccion.declare(nombreVar, nombreTipo));
-            // Si tiene inicializador global (raro pero posible)
+            // Si tiene inicializador global (posible aunque poco común)
             if (ctx.expresion() != null) {
                 String lugar = visit(ctx.expresion());
                 emitir(Instruccion.asignar(nombreVar, lugar));
@@ -145,8 +180,13 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
     }
 
     /**
-     * Declaracion de variable local (dentro de funcion): emite DECLARE + asignacion si aplica.
+     * visitDeclaracionVariable (local):
+     *
+     * - Emite DECLARE para variables locales.
+     * - Si hay inicializador, evalúa la expresión y emite la asignación.
+     * - Maneja arrays y asignaciones especiales.
      */
+
     @Override
     public String visitDeclaracionVariable(MiLenguajeParser.DeclaracionVariableContext ctx) {
         String nombreTipo = ctx.tipo().getText();
@@ -161,6 +201,7 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
             if (ctx.expresion() != null) {
                 String lugar = visit(ctx.expresion());
                 if ("RETURN_VALUE".equals(lugar)) {
+                    // Caso especial: la expresión es el valor de retorno de una llamada
                     emitir(Instruccion.returnValueAssign(nombreVar));
                 } else {
                     emitir(Instruccion.asignar(nombreVar, lugar));
@@ -170,9 +211,14 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return null;
     }
 
-    // =========================================================================
-    // VISITOR — Funciones
-    // =========================================================================
+    /**
+     * visitDeclaracionFuncion:
+     *
+     * - Emite una etiqueta para la función (func_nombre).
+     * - Emite definiciones de parámetros (PARAM_DEF).
+     * - Visita el bloque (cuerpo) de la función.
+     *
+     */
 
     @Override
     public String visitDeclaracionFuncion(MiLenguajeParser.DeclaracionFuncionContext ctx) {
@@ -182,7 +228,7 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         // Etiqueta func_nombre:
         emitir(Instruccion.etiqueta("func_" + nombre));
 
-        // Emitir PARAM para cada parametro
+        // Emitir PARAM para cada parámetro (definición)
         if (ctx.parametros() != null) {
             for (MiLenguajeParser.ParametroContext param : ctx.parametros().parametro()) {
                 String tipoParam   = param.tipo().getText();
@@ -198,10 +244,6 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return null;
     }
 
-    // =========================================================================
-    // VISITOR — Bloque y sentencias
-    // =========================================================================
-
     @Override
     public String visitBloque(MiLenguajeParser.BloqueContext ctx) {
         visitChildren(ctx);
@@ -214,15 +256,20 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return null;
     }
 
-    // =========================================================================
-    // VISITOR — Asignacion
-    // =========================================================================
+    /**
+     * visitAsignacion:
+     *
+     * Dos formas:
+     *   - ID = expr
+     *   - ID[expr] = expr  (asignación a array)
+     *
+     * Evalúa las expresiones y emite la instrucción TAC correspondiente.
+     */
 
     @Override
     public String visitAsignacion(MiLenguajeParser.AsignacionContext ctx) {
-        // Dos formas: ID = expr  |  ID[expr] = expr
+        // ID '[' expr ']' '=' expr
         if (ctx.getChildCount() > 3 && ctx.getChild(1).getText().equals("[")) {
-            // ID '[' expr ']' '=' expr
             String idx = visit(ctx.expresion(0));
             String val = visit(ctx.expresion(1));
             emitir(Instruccion.asignarArrayW(ctx.ID().getText(), idx, val));
@@ -230,6 +277,7 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
             // ID '=' expr
             String lugar = visit(ctx.expresion(0));
             if ("RETURN_VALUE".equals(lugar)) {
+                // Caso especial: asignar el valor retornado por una llamada
                 emitir(Instruccion.returnValueAssign(ctx.ID().getText()));
             } else {
                 emitir(Instruccion.asignar(ctx.ID().getText(), lugar));
@@ -238,9 +286,14 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return null;
     }
 
-    // =========================================================================
-    // VISITOR — Incremento / Decremento (como sentencia)
-    // =========================================================================
+    /**
+     * visitIncremento:
+     *
+     * Implementa i++ y i-- como:
+     *   tN = i + 1
+     *   i = tN
+     *
+     */
 
     @Override
     public String visitIncremento(MiLenguajeParser.IncrementoContext ctx) {
@@ -256,21 +309,26 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return null;
     }
 
-    // =========================================================================
-    // VISITOR — LlamadaFuncion como sentencia
-    // =========================================================================
+    /**
+     * visitLlamadaFuncion (como sentencia):
+     *
+     * - Construye la lista de argumentos evaluando cada expresión.
+     * - Emite CALL sin capturar el valor de retorno (uso como sentencia).
+     */
 
     @Override
     public String visitLlamadaFuncion(MiLenguajeParser.LlamadaFuncionContext ctx) {
-        // Emitir CALL sin capturar el valor de retorno
         String argsStr = construirArgsCall(ctx.argumentos());
         emitir(Instruccion.call("func_" + ctx.ID().getText(), argsStr));
         return null;
     }
 
-    // =========================================================================
-    // VISITOR — Return
-    // =========================================================================
+    /**
+     * visitRetorno:
+     *
+     * - Si hay expresión, la evalúa y emite RETURN con el lugar.
+     * - Si no hay expresión, emite RETURN vacío.
+     */
 
     @Override
     public String visitRetorno(MiLenguajeParser.RetornoContext ctx) {
@@ -283,15 +341,15 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return null;
     }
 
-    // =========================================================================
-    // VISITOR — Break / Continue
-    // =========================================================================
+    /**
+     * visitSentenciaBreak / visitSentenciaContinue:
+     *
+     * - Aquí se emiten saltos simbólicos "BREAK" y "CONTINUE".
+     *
+     */
 
     @Override
     public String visitSentenciaBreak(MiLenguajeParser.SentenciaBreakContext ctx) {
-        // Se genera un goto a la etiqueta de fin del bucle mas cercano.
-        // Como no tenemos stack de etiquetas aqui, emitimos un goto simbolico.
-        // En un compilador real se usaria un stack de etiquetas de salida.
         emitir(Instruccion.saltoIncond("BREAK"));
         return null;
     }
@@ -302,23 +360,23 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return null;
     }
 
-    // =========================================================================
-    // VISITOR — If
-    // =========================================================================
-
     /**
-     * Patron TAC para IF (igual al ejemplo_correcto):
+     * visitSentenciaIf:
+     *
+     * Patrón TAC para IF/ELSE:
      *
      *   tX = <condicion>
      *   if tX goto THEN_N
-     *   goto END_IF_N        (sin else)  |  goto ELSE_N  (con else)
+     *   goto ELSE_N | END_IF_N
      *   THEN_N:
-     *   ...bloque then...
-     *   goto END_IF_N        (con else)
-     *   ELSE_N:              (con else)
-     *   ...bloque else...
+     *     ...then...
+     *     goto END_IF_N
+     *   ELSE_N:
+     *     ...else...
      *   END_IF_N:
+     *
      */
+
     @Override
     public String visitSentenciaIf(MiLenguajeParser.SentenciaIfContext ctx) {
         int n = ++contIf;
@@ -347,21 +405,21 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return null;
     }
 
-    // =========================================================================
-    // VISITOR — While
-    // =========================================================================
-
     /**
-     * Patron TAC para WHILE:
+     * visitSentenciaWhile:
+     *
+     * Patrón TAC para WHILE:
+     *
      *   WHILE_START_N:
-     *   tX = <condicion>
-     *   if tX goto WHILE_BODY_N
-     *   goto WHILE_END_N
+     *     tX = <condicion>
+     *     if tX goto WHILE_BODY_N
+     *     goto WHILE_END_N
      *   WHILE_BODY_N:
-     *   ...cuerpo...
-     *   goto WHILE_START_N
+     *     ...cuerpo...
+     *     goto WHILE_START_N
      *   WHILE_END_N:
      */
+
     @Override
     public String visitSentenciaWhile(MiLenguajeParser.SentenciaWhileContext ctx) {
         int n = ++contWhile;
@@ -380,23 +438,23 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return null;
     }
 
-    // =========================================================================
-    // VISITOR — For
-    // =========================================================================
-
     /**
-     * Patron TAC para FOR:
+     * visitSentenciaFor:
+     *
+     * Patrón TAC para FOR:
+     *
      *   <inicializacion>
      *   FOR_START_N:
-     *   tX = <condicion>
-     *   if tX goto FOR_BODY_N
-     *   goto FOR_END_N
+     *     tX = <condicion>
+     *     if tX goto FOR_BODY_N
+     *     goto FOR_END_N
      *   FOR_BODY_N:
-     *   ...cuerpo...
-     *   <actualizacion>
-     *   goto FOR_START_N
+     *     ...cuerpo...
+     *     <actualizacion>
+     *     goto FOR_START_N
      *   FOR_END_N:
      */
+
     @Override
     public String visitSentenciaFor(MiLenguajeParser.SentenciaForContext ctx) {
         int n = ++contFor;
@@ -404,14 +462,14 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         String labelBody  = "FOR_BODY_" + n;
         String labelEnd   = "FOR_END_" + n;
 
-        // Inicializacion
+        // Inicializacion (declaracion o asignacion)
         if (ctx.inicializacionFor() != null) {
             visitInicializacionFor(ctx.inicializacionFor());
         }
 
         emitir(Instruccion.etiqueta(labelStart));
 
-        // Condicion (puede ser vacia → for infinito)
+        // Condicion (puede ser vacia - for infinito)
         if (ctx.expresion() != null) {
             String cond = visit(ctx.expresion());
             emitir(Instruccion.saltoCondVerdad(cond, labelBody));
@@ -474,9 +532,16 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return null;
     }
 
-    // =========================================================================
-    // VISITOR — Expresiones binarias
-    // =========================================================================
+    /**
+     * Para cada operación binaria:
+     *   1) evaluar operando izquierdo (puede devolver temporal o literal)
+     *   2) evaluar operando derecho
+     *   3) crear nuevo temporal tN
+     *   4) emitir instrucción binaria: tN = izq op der
+     *   5) devolver tN como "lugar" del resultado
+     *
+     * Este patrón se aplica a OR, AND, igualdad, relacionales, aditivas y multiplicativas.
+     */
 
     @Override
     public String visitExprOr(MiLenguajeParser.ExprOrContext ctx) {
@@ -536,10 +601,6 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return t;
     }
 
-    // =========================================================================
-    // VISITOR — Expresiones unarias
-    // =========================================================================
-
     @Override
     public String visitExprNot(MiLenguajeParser.ExprNotContext ctx) {
         String operando = visit(ctx.expresion());
@@ -560,10 +621,6 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
     public String visitExprAgrupada(MiLenguajeParser.ExprAgrupadaContext ctx) {
         return visit(ctx.expresion());
     }
-
-    // =========================================================================
-    // VISITOR — Literales (NO crean temporal, devuelven el valor directo)
-    // =========================================================================
 
     @Override
     public String visitExprEntero(MiLenguajeParser.ExprEnteroContext ctx) {
@@ -595,19 +652,22 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return "false";
     }
 
-    // =========================================================================
-    // VISITOR — Identificadores y arrays
-    // =========================================================================
-
     @Override
     public String visitExprIdentificador(MiLenguajeParser.ExprIdentificadorContext ctx) {
+        // Devuelve el nombre de la variable; el llamador decide si usarlo o cargarlo.
         return ctx.ID().getText();
     }
 
     /**
+     * visitExprArray:
+     *
      * Acceso a array: ID '[' expresion ']'
-     * Genera:  tN = arr[idx]
+     * Genera:
+     *   tN = arr[idx]   (lectura)
+     *
+     * Devuelve tN para que el llamador use el valor.
      */
+
     @Override
     public String visitExprArray(MiLenguajeParser.ExprArrayContext ctx) {
         String idx = visit(ctx.expresion());
@@ -616,44 +676,35 @@ public class CodigoTresDir extends MiLenguajeBaseVisitor<String> {
         return t;
     }
 
-    // =========================================================================
-    // VISITOR — Llamada a funcion como expresion
-    // =========================================================================
-
     /**
-     * Llamada a funcion dentro de una expresion.
-     * Patron:
-     *   CALL func_nombre, arg1, arg2
-     *   dest = RETURN_VALUE
+     * visitExprLlamada:
      *
-     * Devuelve dest para que el llamador pueda usarlo.
+     * - Emite CALL func_nombre, arg1, arg2...
+     * - Devuelve "RETURN_VALUE" como lugar especial.
      *
-     * Ejemplo: estado = sumar(temp, 5)
-     *   CALL func_sumar, temp, 5
-     *   estado = RETURN_VALUE     (esto lo emite visitAsignacion)
-     *
-     * Nota: el valor de retorno se captura con "dest = RETURN_VALUE"
-     * solo cuando el resultado de la llamada se asigna a algo.
-     * visitExprLlamada devuelve "RETURN_VALUE" como lugar,
-     * y el visitor de asignacion/declaracion emite la asignacion.
+     * El contexto que recibe este valor decide si asignarlo a una variable
+     * o usarlo en otra expresión. La separación permite emitir CALL de forma
+     * uniforme y manejar la asignación del valor retornado en el contexto.
      */
+
     @Override
     public String visitExprLlamada(MiLenguajeParser.ExprLlamadaContext ctx) {
-        // El nodo ExprLlamada envuelve un LlamadaFuncion
         MiLenguajeParser.LlamadaFuncionContext llamada = ctx.llamadaFuncion();
         String argsStr = construirArgsCall(llamada.argumentos());
         emitir(Instruccion.call("func_" + llamada.ID().getText(), argsStr));
         return "RETURN_VALUE";
     }
 
-    // =========================================================================
-    // AUXILIAR — construir string de argumentos para CALL
-    // =========================================================================
 
     /**
      * Evalua cada argumento y construye la cadena "arg1, arg2, ..."
-     * que se pone en la instruccion CALL.
+     * que se pone en la instrucción CALL.
+     *
+     * Observación:
+     *   - Cada argumento puede ser un literal, un identificador o un temporal.
+     *   - Se evalúan en orden izquierdo a derecho.
      */
+
     private String construirArgsCall(MiLenguajeParser.ArgumentosContext argumentos) {
         if (argumentos == null) return "";
         StringBuilder sb = new StringBuilder();
