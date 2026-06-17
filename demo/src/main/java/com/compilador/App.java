@@ -19,6 +19,21 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Punto de entrada del compilador.
+ *
+ * Este método coordina TODAS las fases del proceso de compilación:
+ *
+ *   1. Análisis Léxico  — generado por ANTLR4 a partir de la sección LEXER de MiLenguaje.g4.
+ *   2. Análisis Sintáctico — usa el parser generado por ANTLR para construir el árbol.
+ *   3. Construcción y visualización del AST — estructura jerárquica del programa.
+ *   4. Análisis Semántico — tabla de símbolos, verificación de tipos, ámbitos, etc.
+ *   5. Generación de Código Intermedio (TAC) — representación independiente de la máquina.
+ *   6. Optimización — elimina código muerto, propaga constantes, simplifica expresiones y subexpresiones comunes
+ *
+ * Cada fase puede detener la compilación si encuentra errores.
+ */
+
 public class App {
 
     public static void main(String[] args) {
@@ -35,15 +50,25 @@ public class App {
             System.out.println("Iniciando compilacion de: " + archivo);
             System.out.println("============================================================");
 
-            // =========================
-            // 1. LEXICO
-            // =========================
+            /**
+             * ============================================================
+             * 1. ANALISIS LEXICO
+             * ============================================================
+             *
+             * El lexer convierte caracteres a tokens.
+             * ANTLR genera automáticamente MiLenguajeLexer a partir de las
+             * reglas léxicas definidas en la sección LEXER de MiLenguaje.g4.
+             *
+             * Aquí también se instala un "ErrorListener" para
+             * capturar errores léxicos (caracteres inválidos, tokens mal formados).
+             */
 
             CharStream input = CharStreams.fromFileName(archivo, StandardCharsets.UTF_8);
             MiLenguajeLexer lexer = new MiLenguajeLexer(input);
 
             List<String> erroresLexicos = new ArrayList<>();
 
+            // Se reemplazan los listeners por uno propio para acumular errores
             lexer.removeErrorListeners();
             lexer.addErrorListener(new BaseErrorListener() {
                 @Override
@@ -76,9 +101,19 @@ public class App {
             System.out.println(" Analisis lexico completado sin errores.");
             System.out.println("   Tokens procesados: " + cantidadTokens);
 
-            // =========================
-            // 2. SINTACTICO
-            // =========================
+            /**
+             * ============================================================
+             * 2. ANALISIS SINTACTICO
+             * ============================================================
+             *
+             * El parser toma los tokens del lexer y verifica que cumplan
+             * la gramática definida en MiLenguaje.g4 (sección PARSER).
+             *
+             * Si la secuencia de tokens no coincide con ninguna producción,
+             * se genera un error sintáctico.
+             *
+             * El resultado exitoso es un árbol de análisis (ParseTree).
+             */
 
             System.out.println("\n=== 2. ANALISIS SINTACTICO ===");
 
@@ -86,6 +121,7 @@ public class App {
 
             List<String> erroresSintacticos = new ArrayList<>();
 
+            // Listener para errores sintácticos
             parser.removeErrorListeners();
             parser.addErrorListener(new BaseErrorListener() {
                 @Override
@@ -99,6 +135,7 @@ public class App {
                 }
             });
 
+            // Regla inicial de la gramática: "programa"
             MiLenguajeParser.ProgramaContext arbol = parser.programa();
 
             if (!erroresSintacticos.isEmpty()) {
@@ -110,17 +147,34 @@ public class App {
             System.out.println(" Analisis sintactico completado sin errores.");
             System.out.println("   Arbol sintactico generado correctamente");
 
-            // =========================
-            // 3. AST
-            // =========================
+            /**
+             * ============================================================
+             * 3. VISUALIZACION DEL AST
+             * ============================================================
+             *
+             * El AST (Árbol de Sintaxis Abstracta) representa la estructura
+             * jerárquica del programa. ANTLR genera un árbol concreto (ParseTree),
+             * y aquí se muestra gráficamente usando TreeViewer.
+             */
 
             System.out.println("\n=== 3. VISUALIZACION DEL AST ===");
             mostrarArbol(arbol, parser);
             System.out.println("   Ventana del arbol sintactico abierta");
 
-            // =========================
-            // 4. SEMANTICO
-            // =========================
+            /**
+             * ============================================================
+             * 4. ANALISIS SEMANTICO
+             * ============================================================
+             *
+             * El visitor SemanticAnalyzer recorre el AST y construye:
+             *   - Tabla de símbolos (variables, funciones, tipos, ámbitos)
+             *   - Verificación de tipos
+             *   - Detección de variables no declaradas
+             *   - Detección de redeclaraciones
+             *   - Validación de retornos en funciones
+             *
+             * Si encuentra errores semánticos, la compilación se detiene.
+             */
 
             System.out.println("\n=== 4. ANALISIS SEMANTICO ===");
 
@@ -160,9 +214,15 @@ public class App {
 
             System.out.println(" Analisis semantico completado sin errores.");
 
-            // =========================
-            // 5. CODIGO INTERMEDIO
-            // =========================
+            /**
+             * ============================================================
+             * 5. GENERACION DE CODIGO INTERMEDIO (TAC)
+             * ============================================================
+             *
+             * El visitor CodigoTresDir transforma el AST en instrucciones
+             * de tres direcciones (Three Address Code).
+             *
+             */
 
             System.out.println("\n=== 5. GENERACION DE CODIGO INTERMEDIO ===");
             System.out.println(" Iniciando recorrido del AST con CodigoTresDir...");
@@ -189,9 +249,20 @@ public class App {
 
             System.out.println("  Codigo intermedio guardado en: " + archivoSalida);
 
-            // =========================
-            // 6. OPTIMIZACIÓN
-            // =========================
+            /**
+             * ============================================================
+             * 6. OPTIMIZACION
+             * ============================================================
+             *
+             * El Optimizador aplica varias pasadas sobre el TAC:
+             *
+             *   - Propagación de constantes
+             *   - Eliminación de código muerto
+             *   - Simplificación algebraica
+             *   - Eliminación de subexpresiones comunes
+             *
+             * Cada pasada genera un archivo para inspección.
+             */
 
             System.out.println("\n=== 6. OPTIMIZACION DE CODIGO ===");
             System.out.println("   Aplicando optimizaciones al codigo intermedio...");
@@ -241,9 +312,19 @@ public class App {
 
             System.out.println("  Codigo optimizado guardado en: " + archivoOptimizado);
 
-            // =========================
-            // 7. RESUMEN (solo si compilacion exitosa)
-            // =========================
+            /**
+             * ============================================================
+             * 7. RESUMEN DE COMPILACION
+             * ============================================================
+             *
+             * Se imprimen estadísticas útiles:
+             *   - Tokens procesados
+             *   - Símbolos en tabla
+             *   - Instrucciones TAC generadas
+             *   - Instrucciones eliminadas por optimización
+             *
+             * Si todo salió bien: compilación exitosa.
+             */
 
             System.out.println("\n=== 7. RESUMEN DE COMPILACION ===");
             System.out.println("   Archivo procesado:         " + archivo);
