@@ -3,11 +3,44 @@ package com.compilador.semantico;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * ============================================================
+ * TABLA DE SÍMBOLOS
+ * ============================================================
+ *
+ * Esta clase administra la pila de scopes del compilador.
+ *
+ * Es una PILA de ámbitos (Scope), donde cada ámbito contiene:
+ *   - variables
+ *   - parámetros
+ *   - funciones
+ *
+ * El análisis semántico:
+ *   entra a un scope cuando comienza una función o un bloque
+ *   sale del scope al cerrar la llave }
+ *   define símbolos en el scope actual
+ *   resuelve símbolos buscando recursivamente en los padres
+ *
+ */
+
 public class SymbolTable {
 
+    /** Scope actual (el tope de la pila) */
+
     private Scope scopeActual;
+
+    /** Contador para generar nombres únicos de scopes */
+
     private int contadorScopes;
+
+    /** Historial de todos los scopes creados (para imprimir la tabla completa) */
+
     private final List<Scope> historial;
+
+    /**
+     * Constructor.
+     * Crea el scope GLOBAL, que no tiene padre.
+     */
 
     public SymbolTable() {
         Scope global = new Scope("global", null);
@@ -18,23 +51,45 @@ public class SymbolTable {
     }
 
     /**
-     * Entra a un scope de FUNCION: el nombreAmbito es el nombre de la funcion.
-     * Entra a un scope de BLOQUE: hereda el nombreAmbito de la funcion contenedora.
+     * Entra a un nuevo scope.
+     *
+     * @param contexto nombre del contexto:
+     *                 - "bloque" - bloque interno { }
+     *                 - nombre de función - scope de función
+     *
+     * Reglas:
+     *    Los bloques heredan el nombre visible del ámbito padre
+     *    Las funciones usan su propio nombre como ámbito visible
+     *
+     * Ejemplos:
+     *   entrarScope("sumar")  - ámbito "sumar"
+     *   entrarScope("bloque") - ámbito "sumar" (si estamos dentro de sumar)
      */
+
     public void entrarScope(String contexto) {
         contadorScopes++;
+
         String nombreAmbito;
+
         if ("bloque".equals(contexto)) {
-            // Los bloques muestran el mismo ambito que la funcion que los contiene
+            // Los bloques no cambian el nombre visible del ámbito
             nombreAmbito = scopeActual.getNombreAmbito();
         } else {
-            // Funciones usan su propio nombre
+            // Las funciones sí
             nombreAmbito = contexto;
         }
+
+        // Nombre interno único: sumar_1, bloque_2, etc.
         Scope nuevo = new Scope(contexto + "_" + contadorScopes, nombreAmbito, scopeActual);
+
         historial.add(nuevo);
         scopeActual = nuevo;
     }
+
+    /**
+     * Sale del scope actual y vuelve al padre.
+     * No hace nada si ya estamos en el global.
+     */
 
     public void salirScope() {
         if (scopeActual.getPadre() != null) {
@@ -42,13 +97,27 @@ public class SymbolTable {
         }
     }
 
+    /**
+     * Define un símbolo en el scope actual.
+     * Retorna false si ya existe uno con el mismo nombre.
+     */
+
     public boolean definir(Symbol simbolo) {
         return scopeActual.definir(simbolo);
     }
 
+    /**
+     * Busca un símbolo por nombre.
+     * La búsqueda es recursiva hacia los scopes padres.
+     */
+
     public Symbol resolver(String nombre) {
         return scopeActual.resolver(nombre);
     }
+
+    /**
+     * Verifica si un símbolo está declarado en el scope actual.
+     */
 
     public boolean estaDeclaradoLocalmente(String nombre) {
         return scopeActual.estaDefinidoLocalmente(nombre);
@@ -69,6 +138,11 @@ public class SymbolTable {
     public List<Scope> getHistorial() {
         return historial;
     }
+
+    /**
+     * Imprime la tabla de símbolos completa.
+     * Recorre todos los scopes en orden de creación.
+     */
 
     public void imprimirTabla() {
         System.out.println();

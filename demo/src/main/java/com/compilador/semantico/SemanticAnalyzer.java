@@ -6,21 +6,48 @@ import com.compilador.MiLenguajeParser;
 import java.util.ArrayList;
 import java.util.List;
 
+
+/**
+ * ============================================================
+ * ANALISIS SEMANTICO
+ * ============================================================
+ *
+ * Esta clase implementa el Visitor que recorre el AST generado
+ * por ANTLR y realiza TODAS las verificaciones semánticas del lenguaje:
+ *
+ *   Manejo de la tabla de símbolos (variables, funciones, parámetros)
+ *   Manejo de ámbitos (scopes) mediante pila
+ *   Verificación de tipos (TypeSystem)
+ *   Detección de variables no declaradas
+ *   Detección de redeclaraciones
+ *   Detección de variables no usadas (warnings)
+ *   Validación de asignaciones
+ *   Validación de llamadas a funciones
+ *
+ * El Visitor devuelve un String que representa el tipo resultante
+ * de cada expresión visitada (int, double, bool, string, etc.).
+ */
+
 public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
 
+    /** Tabla de símbolos principal (maneja pila de scopes) */
     private final SymbolTable tabla = new SymbolTable();
 
+    /** Listas de errores y advertencias semánticas */
     private final List<SemanticError> errores  = new ArrayList<>();
     private final List<SemanticError> warnings = new ArrayList<>();
 
-    // =========================================================
-    // UTIL
-    // =========================================================
 
+    /**
+     * Registra un error semántico con línea y columna.
+     */
     private void error(int line, int col, String msg) {
         errores.add(new SemanticError(line, col, msg, SemanticError.Severidad.ERROR));
     }
 
+    /**
+     * Registra un warning semántico (no detiene la compilación).
+     */
     private void warning(int line, int col, String msg) {
         warnings.add(new SemanticError(line, col, msg, SemanticError.Severidad.ADVERTENCIA));
     }
@@ -31,18 +58,31 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
     public boolean                hayAdvertencias()   { return !warnings.isEmpty(); }
     public boolean                hayErrores()        { return !errores.isEmpty();  }
 
-    // =========================================================
-    // PROGRAMA
-    // =========================================================
+    /**
+     * Punto de entrada del análisis semántico.
+     *
+     * Recorre todas las declaraciones del archivo fuente.
+     * No crea un nuevo scope porque el scope global ya existe.
+     */
 
     @Override
     public String visitPrograma(MiLenguajeParser.ProgramaContext ctx) {
         return visitChildren(ctx);
     }
 
-    // =========================================================
-    // VARIABLES
-    // =========================================================
+    /**
+     * Maneja la declaración de variables:
+     *
+     *   tipo ID ;
+     *   tipo ID = expresion ;
+     *   tipo ID [NUM] ;
+     *
+     * Acciones:
+     *   Verifica redeclaración en el mismo ámbito
+     *   Crea símbolo (variable o array)
+     *   Verifica compatibilidad de tipos en inicialización
+     *   Marca variable como inicializada si corresponde
+     */
 
     @Override
     public String visitDeclaracionVariable(MiLenguajeParser.DeclaracionVariableContext ctx) {
@@ -54,6 +94,7 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
         // Columna basada en el tipo (primer token de la declaracion)
         int col  = ctx.tipo().start.getCharPositionInLine();
 
+        // Error: redeclaración en el mismo scope
         if (tabla.estaDeclaradoLocalmente(nombre)) {
             error(line, col,
                     "La variable '" + nombre + "' ya esta declarada en el ambito '" +
@@ -71,6 +112,7 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
         }
         tabla.definir(sym);
 
+        // Si hay inicialización, verificar tipos
         if (ctx.expresion() != null) {
             String tipoExpr = visit(ctx.expresion());
             if (!TypeSystem.esCompatibleAsignacion(tipo, tipoExpr)) {
@@ -82,9 +124,19 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
         return TypeSystem.VOID;
     }
 
-    // =========================================================
-    // FUNCIONES  (cubre tipo = void tambien, ya que void es parte de 'tipo')
-    // =========================================================
+    /**
+     * Maneja la declaración de funciones:
+     *
+     *   tipo nombre (parametros) { bloque }
+     *
+     * Acciones:
+     *    Verifica redeclaración
+     *    Crea símbolo de función
+     *    Entra a un nuevo scope con el nombre de la función
+     *    Declara parámetros dentro del scope
+     *    Visita el cuerpo de la función
+     *    Detecta variables no usadas
+     */
 
     @Override
     public String visitDeclaracionFuncion(MiLenguajeParser.DeclaracionFuncionContext ctx) {
@@ -95,6 +147,7 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
         int line = ctx.ID().getSymbol().getLine();
         int col  = ctx.tipo().start.getCharPositionInLine();
 
+        // Error: función ya declarada
         if (tabla.estaDeclaradoLocalmente(nombre)) {
             error(line, col,
                     "La funcion '" + nombre + "' ya esta declarada en el ambito '" +
@@ -102,11 +155,14 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
             return TypeSystem.ERROR;
         }
 
+        // Registrar función en el scope actual
         Symbol funSym = Symbol.funcion(nombre, tipoRetorno, line, col);
         tabla.definir(funSym);
 
+        // Nuevo scope para parámetros y variables locales
         tabla.entrarScope(nombre);
 
+        // Declarar parámetros
         if (ctx.parametros() != null) {
             for (MiLenguajeParser.ParametroContext p : ctx.parametros().parametro()) {
                 String tipo = p.tipo().getText();
@@ -116,7 +172,7 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
                 int pCol  = p.ID().getSymbol().getCharPositionInLine();
 
                 Symbol paramSym = Symbol.parametro(id, tipo, pLine, pCol);
-                paramSym.setUsado(true); // parametros se consideran usados
+                paramSym.setUsado(true); // Los parámetros se consideran usados
                 tabla.definir(paramSym);
 
                 // Agregar tipo a la firma de la funcion
@@ -134,9 +190,14 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
         return TypeSystem.VOID;
     }
 
-    // =========================================================
-    // BLOQUE
-    // =========================================================
+
+    /**
+     * Cada bloque { ... } crea un nuevo scope.
+     * Esto permite:
+     *   variables locales
+     *   ocultamiento de variables
+     *   warnings de variables no usadas
+     */
 
     @Override
     public String visitBloque(MiLenguajeParser.BloqueContext ctx) {
@@ -148,6 +209,11 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
         return TypeSystem.VOID;
     }
 
+    /**
+     * Recorre todas las variables del scope y genera warnings
+     * por variables declaradas pero nunca utilizadas.
+     */
+
     private void checkUnusedVariables(Scope scope) {
         for (Symbol s : scope.getSimbolos()) {
             if (s.getCategoria() == Symbol.Categoria.VARIABLE && !s.isUsado()) {
@@ -158,9 +224,18 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
         }
     }
 
-    // =========================================================
-    // ASIGNACION
-    // =========================================================
+    /**
+     * Maneja asignaciones:
+     *
+     *   ID = expresion ;
+     *
+     * Acciones:
+     *    Verifica que la variable exista
+     *    Verifica que no sea una función
+     *    Evalúa el tipo de la expresión
+     *    Verifica compatibilidad de tipos
+     *    Marca la variable como inicializada y usada
+     */
 
     @Override
     public String visitAsignacion(MiLenguajeParser.AsignacionContext ctx) {
@@ -200,10 +275,6 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
         return sym.getTipo();
     }
 
-    // =========================================================
-    // CONTROL
-    // =========================================================
-
     @Override
     public String visitSentenciaIf(MiLenguajeParser.SentenciaIfContext ctx) {
         visit(ctx.expresion());
@@ -219,9 +290,16 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
         return TypeSystem.VOID;
     }
 
-    // =========================================================
-    // LLAMADA A FUNCION (como sentencia)
-    // =========================================================
+    /**
+     * Llamada a función como sentencia:
+     *
+     *   f(x, y);
+     *
+     * Acciones:
+     *   Verifica que la función exista
+     *   Marca la función como usada
+     *   Evalúa los argumentos
+     */
 
     @Override
     public String visitLlamadaFuncion(MiLenguajeParser.LlamadaFuncionContext ctx) {
@@ -236,9 +314,10 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
         return sym != null ? sym.getTipo() : TypeSystem.ERROR;
     }
 
-    // =========================================================
-    // EXPRESIONES
-    // =========================================================
+    /**
+     * Cada expresión delega la verificación de tipos al TypeSystem.
+     * Esto mantiene el Visitor limpio y modular.
+     */
 
     @Override
     public String visitExprAditiva(MiLenguajeParser.ExprAditivaContext ctx) {
@@ -285,18 +364,10 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
         return visit(ctx.expresion());
     }
 
-    // =========================================================
-    // LLAMADA A FUNCION como expresion (estado = sumar(a, b))
-    // =========================================================
-
     @Override
     public String visitExprLlamada(MiLenguajeParser.ExprLlamadaContext ctx) {
         return visitLlamadaFuncion(ctx.llamadaFuncion());
     }
-
-    // =========================================================
-    // LITERALES
-    // =========================================================
 
     @Override public String visitExprEntero(MiLenguajeParser.ExprEnteroContext ctx)    { return TypeSystem.INT;    }
     @Override public String visitExprDecimal(MiLenguajeParser.ExprDecimalContext ctx)   { return TypeSystem.DOUBLE; }
@@ -305,9 +376,16 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
     @Override public String visitExprTrue(MiLenguajeParser.ExprTrueContext ctx)         { return TypeSystem.BOOL;   }
     @Override public String visitExprFalse(MiLenguajeParser.ExprFalseContext ctx)       { return TypeSystem.BOOL;   }
 
-    // =========================================================
-    // IDENTIFICADOR como expresion
-    // =========================================================
+    /**
+     * Uso de variable:
+     *
+     *   x
+     *
+     * Acciones:
+     *   Verifica que la variable exista
+     *   Marca como usada
+     *   Devuelve su tipo
+     */
 
     @Override
     public String visitExprIdentificador(MiLenguajeParser.ExprIdentificadorContext ctx) {
@@ -326,9 +404,9 @@ public class SemanticAnalyzer extends MiLenguajeBaseVisitor<String> {
         return sym.getTipo();
     }
 
-    // =========================================================
-    // AUXILIAR: nombre legible del ambito actual
-    // =========================================================
+    /**
+     * Devuelve el nombre del ámbito actual para mensajes de error.
+     */
 
     private String resolverNombreAmbitoActual() {
         return tabla.getScopeActual().getNombreAmbito();

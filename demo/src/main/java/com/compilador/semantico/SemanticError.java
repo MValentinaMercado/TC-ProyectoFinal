@@ -1,32 +1,72 @@
 package com.compilador.semantico;
 
 /**
- * Mensaje diagnostico producido durante el analisis semantico.
+ * ============================================================
+ * SEMANTIC ERROR
+ * ============================================================
  *
- * SemanticAnalyzer mantiene dos listas separadas: una para ERRORs y otra
- * para ADVERTENCIAs.  Usar un unico tipo con un campo de severidad permite
- * que las dos listas compartan el mismo tipo y que toString() elija
- * automaticamente la etiqueta correcta al imprimir.
+ * Esta clase representa un diagnóstico producido durante el
+ * análisis semántico. Puede ser:
  *
- * Salida de toString():
- *   [Linea 13:4] Error semantico: no se puede asignar tipo 'string' …
- *   [Linea  7:8] Advertencia semantica: variable 'x' usada sin inicializar
+ *   ERROR        - el programa es incorrecto
+ *   ADVERTENCIA  - el programa es válido pero sospechoso
+ *
+ * El SemanticAnalyzer mantiene dos listas separadas:
+ *   - errores
+ *   - warnings
+ *
+ * Pero ambos usan esta misma clase, diferenciados por la
+ * enumeración Severidad.
+ *
+ * Ejemplos:
+ *   Error: variable 'x' no declarada (linea 4, columna 10)
+ *   Advertencia: variable 'y' declarada pero nunca usada (linea 7)
+ *
+ * Esta clase NO detiene la compilación: solo almacena el mensaje.
+ * La decisión de abortar o continuar la toma App.java.
  */
+
 public class SemanticError {
 
     /**
-     * ERROR      — problema que impide que el programa sea correcto.
-     *              El compilador reporta el error y sigue analizando (no aborta)
-     *              para poder mostrar todos los errores de una sola pasada.
-     * ADVERTENCIA — condicion sospechosa pero no invalida (variable sin inicializar).
-     *              El programa puede compilar y ejecutar, pero podria tener bugs.
+     * Severidad del diagnóstico:
+     *
+     * ERROR:
+     *   - Implica que el programa viola las reglas del lenguaje.
+     *   - El compilador debe reportarlo pero NO abortar inmediatamente,
+     *     para poder mostrar todos los errores en una sola pasada.
+     *
+     * ADVERTENCIA:
+     *   - No impide compilar.
+     *   - Indica un posible bug (variable no usada, no inicializada, etc.).
      */
+
     public enum Severidad { ERROR, ADVERTENCIA }
 
-    private final int       linea;
-    private final int       columna;
-    private final String    mensaje;
+    /** Línea donde ocurrió el problema */
+
+    private final int linea;
+
+    /** Columna donde ocurrió el problema */
+
+    private final int columna;
+
+    /** Mensaje descriptivo del error o advertencia */
+
+    private final String mensaje;
+
+    /** Severidad del diagnóstico */
+
     private final Severidad severidad;
+
+    /**
+     * Constructor.
+     *
+     * @param linea     línea del código fuente
+     * @param columna   columna del código fuente
+     * @param mensaje   descripción del problema
+     * @param severidad ERROR o ADVERTENCIA
+     */
 
     public SemanticError(int linea, int columna, String mensaje, Severidad severidad) {
         this.linea     = linea;
@@ -39,6 +79,13 @@ public class SemanticError {
     public int       getColumna()   { return columna;   }
     public String    getMensaje()   { return mensaje;   }
     public Severidad getSeveridad() { return severidad; }
+
+    /**
+     * Formato estándar del mensaje:
+     *
+     *   Error: mensaje (linea X, columna Y)
+     *   Advertencia: mensaje (linea X, columna Y)
+     */
 
     @Override
     public String toString() {

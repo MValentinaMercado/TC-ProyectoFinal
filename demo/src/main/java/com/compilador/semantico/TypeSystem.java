@@ -1,8 +1,23 @@
 package com.compilador.semantico;
 
 /**
- * Centraliza todas las reglas de tipos del lenguaje.
+ * ============================================================
+ * TYPE SYSTEM
+ * ============================================================
+ *
+ * Esta clase centraliza TODAS las reglas de tipos del lenguaje.
+ *
+ * El análisis semántico NO decide tipos por sí mismo.
+ * Siempre delega en TypeSystem:
+ *
+ *   compatibilidad de asignaciones
+ *   tipos resultantes de operaciones aritméticas
+ *   tipos resultantes de comparaciones
+ *   tipos resultantes de operadores lógicos
+ *   validación de operadores unarios (!, -)
+ *
  */
+
 public class TypeSystem {
 
     private TypeSystem() {}
@@ -25,35 +40,33 @@ public class TypeSystem {
     // ============================================================
 
     /**
-     * Reglas:
+     * Verifica si es válido asignar un valor de tipo "desde"
+     * a una variable de tipo "hacia".
      *
-     * int    <- int
-     * double <- double
-     * double <- int
-     * char   <- char
-     * string <- string
-     * bool   <- bool
+     * Reglas del lenguaje:
+     *
+     *   int    <- int
+     *   double <- double
+     *   double <- int (widening: convertir un tipo mas pequeño a uno mas grande)
+     *   char   <- char
+     *   string <- string
+     *   bool   <- bool
+     *
+     * Cualquier otra combinación es inválida.
      */
-    public static boolean esCompatibleAsignacion(
-            String hacia,
-            String desde) {
 
-        if (hacia == null || desde == null) {
-            return false;
-        }
+    public static boolean esCompatibleAsignacion(String hacia, String desde) {
 
-        if (ERROR.equals(hacia) || ERROR.equals(desde)) {
-            return true;
-        }
+        if (hacia == null || desde == null) return false;
 
-        if (hacia.equals(desde)) {
-            return true;
-        }
+        // Si ya hubo un error previo, no duplicamos errores
+        if (ERROR.equals(hacia) || ERROR.equals(desde)) return true;
 
-        // widening permitido
-        if (DOUBLE.equals(hacia) && INT.equals(desde)) {
-            return true;
-        }
+        // Tipos idénticos
+        if (hacia.equals(desde)) return true;
+
+        // Widening: int - double
+        if (DOUBLE.equals(hacia) && INT.equals(desde)) return true;
 
         return false;
     }
@@ -62,25 +75,27 @@ public class TypeSystem {
     // OPERACIONES ARITMETICAS
     // ============================================================
 
-    public static String inferirAritmetico(
-            String izq,
-            String der) {
+    /**
+     * Determina el tipo resultante de una operación aritmética.
+     *
+     * Reglas:
+     *   int + int       - int
+     *   int + double    - double
+     *   double + double - double
+     *
+     * Si alguno no es numérico - ERROR.
+     */
+    
+    public static String inferirAritmetico(String izq, String der) {
 
-        if (ERROR.equals(izq)
-                || ERROR.equals(der)
-                || izq == null
-                || der == null) {
-
+        if (ERROR.equals(izq) || ERROR.equals(der) || izq == null || der == null)
             return ERROR;
-        }
 
-        if (!esNumerico(izq) || !esNumerico(der)) {
+        if (!esNumerico(izq) || !esNumerico(der))
             return ERROR;
-        }
 
-        if (DOUBLE.equals(izq) || DOUBLE.equals(der)) {
+        if (DOUBLE.equals(izq) || DOUBLE.equals(der))
             return DOUBLE;
-        }
 
         return INT;
     }
@@ -89,21 +104,19 @@ public class TypeSystem {
     // OPERADORES RELACIONALES
     // ============================================================
 
-    public static String inferirRelacional(
-            String izq,
-            String der) {
+    /**
+     * Reglas:
+     *   num < num - bool
+     *   num > num - bool
+     */
+    
+    public static String inferirRelacional(String izq, String der) {
 
-        if (ERROR.equals(izq)
-                || ERROR.equals(der)
-                || izq == null
-                || der == null) {
-
+        if (ERROR.equals(izq) || ERROR.equals(der) || izq == null || der == null)
             return ERROR;
-        }
 
-        if (!esNumerico(izq) || !esNumerico(der)) {
+        if (!esNumerico(izq) || !esNumerico(der))
             return ERROR;
-        }
 
         return BOOL;
     }
@@ -112,25 +125,21 @@ public class TypeSystem {
     // IGUALDAD
     // ============================================================
 
-    public static String inferirIgualdad(
-            String izq,
-            String der) {
+    /**
+     * Reglas:
+     *   tipos iguales - bool
+     *   num == num   - bool
+     *   otro caso    - error
+     */
+    
+    public static String inferirIgualdad(String izq, String der) {
 
-        if (ERROR.equals(izq)
-                || ERROR.equals(der)
-                || izq == null
-                || der == null) {
-
+        if (ERROR.equals(izq) || ERROR.equals(der) || izq == null || der == null)
             return ERROR;
-        }
 
-        if (izq.equals(der)) {
-            return BOOL;
-        }
+        if (izq.equals(der)) return BOOL;
 
-        if (esNumerico(izq) && esNumerico(der)) {
-            return BOOL;
-        }
+        if (esNumerico(izq) && esNumerico(der)) return BOOL;
 
         return ERROR;
     }
@@ -139,21 +148,19 @@ public class TypeSystem {
     // LOGICOS
     // ============================================================
 
-    public static String inferirLogico(
-            String izq,
-            String der) {
+    /**
+     * Reglas:
+     *   bool && bool - bool
+     *   bool || bool - bool
+     */
+    
+    public static String inferirLogico(String izq, String der) {
 
-        if (ERROR.equals(izq)
-                || ERROR.equals(der)
-                || izq == null
-                || der == null) {
-
+        if (ERROR.equals(izq) || ERROR.equals(der) || izq == null || der == null)
             return ERROR;
-        }
 
-        if (BOOL.equals(izq) && BOOL.equals(der)) {
+        if (BOOL.equals(izq) && BOOL.equals(der))
             return BOOL;
-        }
 
         return ERROR;
     }
@@ -162,48 +169,49 @@ public class TypeSystem {
     // NOT
     // ============================================================
 
+    /**
+     * Reglas:
+     *   !bool - bool
+     */
+    
     public static String inferirNot(String operando) {
 
-        if (ERROR.equals(operando)
-                || operando == null) {
-
+        if (ERROR.equals(operando) || operando == null)
             return ERROR;
-        }
 
-        return BOOL.equals(operando)
-                ? BOOL
-                : ERROR;
+        return BOOL.equals(operando) ? BOOL : ERROR;
     }
 
     // ============================================================
     // NEGATIVO UNARIO
     // ============================================================
 
+    /**
+     * Reglas:
+     *   -num - num
+     */
+    
     public static String inferirNegativo(String operando) {
 
-        if (ERROR.equals(operando)
-                || operando == null) {
-
+        if (ERROR.equals(operando) || operando == null)
             return ERROR;
-        }
 
-        return esNumerico(operando)
-                ? operando
-                : ERROR;
+        return esNumerico(operando) ? operando : ERROR;
     }
 
     // ============================================================
     // AUXILIARES
     // ============================================================
 
+    /** Retorna true si el tipo es numérico */
+    
     public static boolean esNumerico(String tipo) {
-
-        return INT.equals(tipo)
-                || DOUBLE.equals(tipo);
+        return INT.equals(tipo) || DOUBLE.equals(tipo);
     }
 
+    /** Verifica si un tipo pertenece al lenguaje */
+    
     public static boolean esValido(String tipo) {
-
         return INT.equals(tipo)
                 || DOUBLE.equals(tipo)
                 || CHAR.equals(tipo)
@@ -216,39 +224,15 @@ public class TypeSystem {
     // MENSAJES
     // ============================================================
 
-    public static String msgIncompatible(
-            String hacia,
-            String desde) {
-
-        return "no se puede asignar tipo '"
-                + desde
-                + "' a variable de tipo '"
-                + hacia
-                + "'";
+    public static String msgIncompatible(String hacia, String desde) {
+        return "no se puede asignar tipo '" + desde + "' a variable de tipo '" + hacia + "'";
     }
 
-    public static String msgOperadorInvalido(
-            String operador,
-            String izq,
-            String der) {
-
-        return "el operador '"
-                + operador
-                + "' no puede aplicarse a tipos '"
-                + izq
-                + "' y '"
-                + der
-                + "'";
+    public static String msgOperadorInvalido(String operador, String izq, String der) {
+        return "el operador '" + operador + "' no puede aplicarse a tipos '" + izq + "' y '" + der + "'";
     }
 
-    public static String msgUnarioInvalido(
-            String operador,
-            String tipo) {
-
-        return "el operador '"
-                + operador
-                + "' no puede aplicarse al tipo '"
-                + tipo
-                + "'";
+    public static String msgUnarioInvalido(String operador, String tipo) {
+        return "el operador '" + operador + "' no puede aplicarse al tipo '" + tipo + "'";
     }
 }
